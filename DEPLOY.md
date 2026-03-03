@@ -57,9 +57,11 @@
 
 4. **配置构建设置**
    - Framework preset: `None`
-   - Build command: 留空
-   - Build output directory: `/`
-   - Root directory: `/`
+   - Build command: 留空（或填 `echo "No build needed"`）
+   - Build output directory: `/`（根目录）
+   - Root directory: `/`（根目录）
+   
+   **重要：** 因为是纯静态 HTML 项目，不需要构建步骤
 
 5. **部署**
    - 点击 "Save and Deploy"
