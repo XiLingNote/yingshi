@@ -26,8 +26,8 @@ echo.
 echo 📤 开始部署到 Cloudflare Pages...
 echo.
 
-REM 部署
-wrangler pages deploy . --project-name=yingshiyun-monitor
+REM 部署（使用 pages publish 命令）
+wrangler pages deploy . --project-name=yingshiyun-monitor --branch=main
 
 echo.
 echo ✅ 部署完成！
