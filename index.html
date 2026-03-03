@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="description" content="萤石云智能监控 - App Native Style">
+    <title>萤石智能生活</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- EZUIKit -->
+    <script src="https://unpkg.com/ezuikit-js@8.2.6/ezuikit.js"></script>
+    <!-- Tailwind CSS (for rapid exact React-style mapping) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: #000;
+            user-select: none;
+            -webkit-user-select: none;
+            overscroll-behavior-y: none;
+        }
+
+        /* 桌面端套上手机壳样式展示 */
+        @media (min-width: 768px) {
+            body {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                background-color: #1a1a2e;
+            }
+
+            #app {
+                width: 375px;
+                height: 812px;
+                border-radius: 40px;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+                border: 8px solid #222;
+                position: relative;
+                overflow: hidden;
+            }
+        }
+
+        @media (max-width: 767px) {
+            #app {
+                width: 100vw;
+                height: 100dvh;
+                position: relative;
+                overflow: hidden;
+            }
+        }
+
+        /* Video Container fix */
+        #video-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        #video-container iframe,
+        #video-container video,
+        #video-container canvas {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain;
+        }
+
+        .hide-scroll::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hide-scroll {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Bottom Sheet Styles */
+        .bottom-sheet {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-radius: 24px 24px 0 0;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 50;
+            padding: 24px;
+            padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.1);
+            /* 防止内容超高把 X 按钮推出屏幕 */
+            max-height: 80vh;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+
+        .bottom-sheet.open {
+            transform: translateY(0);
+        }
+
+        .sheet-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 40;
+            backdrop-filter: blur(2px);
+        }
+
+        .sheet-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Talk active state - pre-defined so Tailwind CDN can work */
+        .talk-active {
+            background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+            color: #fff !important;
+            border-color: rgba(96, 165, 250, 0.4) !important;
+            animation: mic-pulse 1.2s ease-in-out infinite;
+        }
+
+        @keyframes mic-pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.15), 0 8px 20px rgba(37, 99, 235, 0.4);
+            }
+
+            50% {
+                box-shadow: 0 0 0 14px rgba(59, 130, 246, 0.0), 0 8px 24px rgba(37, 99, 235, 0.6);
+            }
+        }
+
+        /* Toolbar button active press feedback */
+        .toolbar-btn:active {
+            opacity: 0.6;
+            transform: scale(0.9);
+        }
+
+        /* PTZ D-pad */
+        .d-pad {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: #f8fafc;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05), inset 0 2px 4px rgba(255, 255, 255, 1);
+            border: 1px solid #e2e8f0;
+            margin: 0 auto;
+        }
+
+        .d-pad-btn {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            cursor: pointer;
+            border: none;
+            background: none;
+            transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .d-pad-btn:active {
+            color: #3b82f6;
+            transform: scale(1.15);
+        }
+
+        .d-up {
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .d-down {
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .d-left {
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .d-right {
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .d-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #ffffff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #3b82f6;
+            font-weight: 600;
+            gap: 2px;
+            border: 1px solid #f1f5f9;
+        }
+
+        /* Toast */
+        .toast {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translate(-50%, 20px);
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(8px);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 13px;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        /* Fullscreen utility for the wrapper */
+        :-webkit-full-screen #video-wrapper {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        :fullscreen #video-wrapper {
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app" class="bg-gray-50 flex flex-col relative w-full h-full text-gray-800">
+
+        <!-- ======================= -->
+        <!-- 顶部标题栏 -->
+        <!-- ======================= -->
+        <div
+            class="flex flex-none items-center justify-between px-4 py-3 bg-white z-20 sticky top-0 border-b border-gray-100">
+            <i data-lucide="chevron-left" class="text-gray-800 w-6 h-6 cursor-pointer" onclick="showToast('返回')"></i>
+            <h1 class="text-lg font-semibold text-gray-800 tracking-tight">临时监控</h1>
+            <i data-lucide="settings" class="text-gray-800 w-5 h-5 cursor-pointer" onclick="openSheet('info')"></i>
+        </div>
+
+        <!-- ======================= -->
+        <!-- 视频播放核心区 -->
+        <!-- ======================= -->
+        <div class="relative w-full aspect-video bg-black group flex-none z-10" id="video-wrapper">
+            <!-- 容器 -->
+            <div id="video-container" class="absolute inset-0"></div>
+
+            <!-- Loading Mask -->
+            <div class="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 backdrop-blur-sm transition-opacity duration-300"
+                id="loadingOverlay">
+                <div class="w-8 h-8 flex-none border-4 border-white/20 border-t-blue-500 rounded-full animate-spin">
+                </div>
+                <div class="text-white text-xs mt-3 font-medium tracking-widest" id="statusText">正在建立安全连接...</div>
+            </div>
+
+            <!-- 状态信息悬浮层 (Top Left) -->
+            <div class="absolute top-3 left-3 flex items-center gap-2 z-30 pointer-events-none">
+                <div class="flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2 py-1 rounded text-[10px] text-white font-bold"
+                    id="liveBadge">
+                    <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"
+                        id="liveDot"></div>
+                    <span id="liveText" class="tracking-wider">LIVE</span>
+                </div>
+            </div>
+
+            <!-- 操作悬浮层 (Bottom Right) -->
+            <div class="absolute bottom-3 right-3 flex items-center gap-3.5 z-30">
+                <div class="bg-black/40 backdrop-blur-md px-2.5 py-1 rounded text-xs text-white cursor-pointer hover:bg-black/60 font-medium"
+                    onclick="toggleQuality()" id="qualityBadge">标清</div>
+
+                <div class="p-1.5 bg-black/40 backdrop-blur-md rounded-full cursor-pointer hover:bg-black/60 text-white"
+                    onclick="toggleSound()">
+                    <i data-lucide="volume-x" class="w-4 h-4" id="btnSoundIcon"></i>
+                </div>
+
+                <div class="p-1.5 bg-black/40 backdrop-blur-md rounded-full cursor-pointer hover:bg-black/60 text-white"
+                    onclick="goFullscreen()" id="btnFullscreen">
+                    <i data-lucide="maximize-2" class="w-4 h-4" id="btnFullscreenIcon"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================= -->
+        <!-- 快捷工具条 -->
+        <!-- ======================= -->
+        <div class="flex flex-none justify-around items-center bg-white border-b border-gray-100 shadow-sm relative z-20"
+            style="padding: 12px 8px 16px;">
+            <!-- 截图 -->
+            <div class="toolbar-btn flex flex-col items-center gap-1.5 cursor-pointer w-14 transition-transform"
+                onclick="capture()">
+                <div class="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center">
+                    <i data-lucide="camera" class="w-5 h-5 text-gray-600"></i>
+                </div>
+                <span class="text-[10px] text-gray-500 font-medium">截图</span>
+            </div>
+
+            <!-- 录像 -->
+            <div class="toolbar-btn flex flex-col items-center gap-1.5 cursor-pointer w-14 transition-transform"
+                id="btnRecordWrap" onclick="toggleRecord()">
+                <div class="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center" id="btnRecordBg">
+                    <i data-lucide="video" class="w-5 h-5 text-gray-600" id="btnRecordIcon"></i>
+                </div>
+                <span class="text-[10px] text-gray-500 font-medium" id="btnRecordText">录像</span>
+            </div>
+
+            <!-- 对讲 中心凸起 - 修复：父容器需要 overflow-visible 且 z-index 需要高于工具栏 -->
+            <div style="position:relative; z-index:30; margin-top:-28px; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer;"
+                onclick="toggleTalk()" id="btnTalkOuter">
+                <div style="padding:18px; border-radius:50%; background:#eff6ff; color:#3b82f6; border:4px solid #fff; box-shadow:0 4px 16px rgba(59,130,246,0.18); transition:all 0.3s; width:72px; height:72px; display:flex; align-items:center; justify-content:center;"
+                    id="btnTalkBubble">
+                    <i data-lucide="mic" class="w-7 h-7" id="btnTalkIcon"></i>
+                </div>
+                <span style="font-size:10px; color:#3b82f6; font-weight:600; white-space:nowrap;"
+                    id="btnTalkText">语音对讲</span>
+            </div>
+
+            <!-- 回放 -->
+            <div class="flex flex-col items-center gap-1 cursor-pointer w-16 transition-colors" id="btnPlaybackWrap"
+                onclick="switchToPlayback()">
+                <i data-lucide="history" class="w-6 h-6 text-gray-700" id="btnPlaybackIcon"></i>
+                <span class="text-[10px] text-gray-500 font-medium" id="btnPlaybackText">回放</span>
+            </div>
+
+            <!-- 暂停/播放 -->
+            <div class="flex flex-col items-center gap-1 cursor-pointer w-16" onclick="togglePlay()">
+                <i data-lucide="pause-circle" class="w-6 h-6 text-gray-700" id="btnPlayStateIcon"></i>
+                <span class="text-[10px] text-gray-500 font-medium" id="btnPlayStateText">暂停</span>
+            </div>
+        </div>
+
+        <!-- ======================= -->
+        <!-- 功能矩阵区 (应用网格) -->
+        <!-- ======================= -->
+        <div class="flex-1 p-6 grid grid-cols-2 gap-y-7 gap-x-4 overflow-y-auto hide-scroll bg-[#f8fafc] content-start">
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer group" onclick="openSheet('ptz')">
+                <div
+                    class="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-blue-500 group-active:scale-95 group-active:bg-blue-50 transition-all">
+                    <i data-lucide="move" class="w-7 h-7"></i>
+                </div>
+                <span class="text-[11px] text-gray-600 font-medium tracking-wide">云台控制</span>
+            </div>
+
+            <div class="flex flex-col items-center gap-2 cursor-pointer group" onclick="openSheet('info')">
+                <div
+                    class="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-gray-600 group-active:scale-95 group-active:bg-gray-100 transition-all">
+                    <i data-lucide="settings" class="w-7 h-7"></i>
+                </div>
+                <span class="text-[11px] text-gray-600 font-medium tracking-wide">系统设置</span>
+            </div>
+        </div>
+
+        <!-- ======================= -->
+        <!-- 底部安全提示横幅 -->
+        <!-- ======================= -->
+        <div class="mt-auto bg-white p-4 flex-none shadow-[0_-4px_20px_rgba(0,0,0,0.02)] relative z-10 rounded-t-3xl">
+            <div
+                class="bg-blue-50/80 p-3 rounded-2xl flex items-center gap-3 active:bg-blue-100 transition-colors cursor-pointer border border-blue-100/50">
+                <div class="bg-blue-500 p-2.5 rounded-[14px] text-white shadow-md shadow-blue-500/20">
+                    <i data-lucide="shield-check" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="text-[13px] font-bold text-blue-900">安全防护中</div>
+                    <div class="text-[11px] text-blue-600 mt-0.5" id="connStatusText">设备通信加密正常 • L43005986</div>
+                </div>
+                <i data-lucide="chevron-right" class="text-blue-400 w-5 h-5"></i>
+            </div>
+        </div>
+
+        <!-- Bottom Sheets & Toast go INSIDE #app so position:absolute scopes to it -->
+
+        <!-- Overlay -->
+        <div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()"></div>
+
+        <!-- PTZ Sheet -->
+        <div class="bottom-sheet" id="sheetPtz">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-lg font-bold text-gray-800 tracking-tight">云台控制</h2>
+                <div class="p-2 bg-gray-100 rounded-full cursor-pointer hover:bg-gray-200 transition-colors"
+                    onclick="closeSheet()">
+                    <i data-lucide="x" class="text-gray-500 w-5 h-5"></i>
+                </div>
+            </div>
+
+            <div class="d-pad mb-8">
+                <button class="d-pad-btn d-up" onmousedown="ptzStart(0)" onmouseup="ptzStop()"
+                    ontouchstart="ptzStart(0)" ontouchend="ptzStop()">
+                    <i data-lucide="chevron-up" class="w-10 h-10"></i>
+                </button>
+                <button class="d-pad-btn d-left" onmousedown="ptzStart(2)" onmouseup="ptzStop()"
+                    ontouchstart="ptzStart(2)" ontouchend="ptzStop()">
+                    <i data-lucide="chevron-left" class="w-10 h-10"></i>
+                </button>
+                <button class="d-pad-btn d-right" onmousedown="ptzStart(3)" onmouseup="ptzStop()"
+                    ontouchstart="ptzStart(3)" ontouchend="ptzStop()">
+                    <i data-lucide="chevron-right" class="w-10 h-10"></i>
+                </button>
+                <button class="d-pad-btn d-down" onmousedown="ptzStart(1)" onmouseup="ptzStop()"
+                    ontouchstart="ptzStart(1)" ontouchend="ptzStop()">
+                    <i data-lucide="chevron-down" class="w-10 h-10"></i>
+                </button>
+                <div class="d-center">
+                    <i data-lucide="move" class="w-6 h-6"></i>
+                    <span class="text-[10px] uppercase font-bold text-blue-400">PTZ</span>
+                </div>
+            </div>
+
+            <div class="flex gap-4 justify-center">
+                <button
+                    class="flex-1 max-w-[140px] bg-gray-100/80 px-4 py-3.5 rounded-[18px] text-gray-800 font-semibold text-sm flex items-center justify-center gap-2 active:bg-gray-200 transition-colors"
+                    onmousedown="ptzStart(8)" onmouseup="ptzStop()" ontouchstart="ptzStart(8)" ontouchend="ptzStop()">
+                    <i data-lucide="zoom-in" class="w-5 h-5 text-gray-500"></i> 拉近放大
+                </button>
+                <button
+                    class="flex-1 max-w-[140px] bg-gray-100/80 px-4 py-3.5 rounded-[18px] text-gray-800 font-semibold text-sm flex items-center justify-center gap-2 active:bg-gray-200 transition-colors"
+                    onmousedown="ptzStart(9)" onmouseup="ptzStop()" ontouchstart="ptzStart(9)" ontouchend="ptzStop()">
+                    <i data-lucide="zoom-out" class="w-5 h-5 text-gray-500"></i> 推远缩小
+                </button>
+            </div>
+        </div>
+
+        <!-- Info / Log Sheet -->
+        <div class="bottom-sheet" id="sheetInfo">
+            <div style="position:sticky; top:0; background:#fff; z-index:2; padding-bottom:12px; margin-bottom:4px;">
+                <div style="width:36px;height:4px;background:#e5e7eb;border-radius:2px;margin:0 auto 16px;"></div>
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-gray-800 tracking-tight">系统状态与日志</h2>
+                    <div class="p-2 bg-gray-100 rounded-full cursor-pointer hover:bg-gray-200 transition-colors"
+                        onclick="closeSheet()" style="flex-shrink:0;">
+                        <i data-lucide="x" class="text-gray-500 w-5 h-5"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 rounded-[20px] p-5 mb-5 border border-gray-100">
+                <div class="flex justify-between py-2 border-b border-gray-200/60 text-[13px]">
+                    <span class="text-gray-500 tracking-wide">设备序列号</span>
+                    <span class="font-bold text-gray-800">L43005986</span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-gray-200/60 text-[13px]">
+                    <span class="text-gray-500 tracking-wide">通道号</span>
+                    <span class="font-bold text-gray-800">1</span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-gray-200/60 text-[13px]">
+                    <span class="text-gray-500 tracking-wide">App Key</span>
+                    <span class="font-bold text-gray-400 font-mono text-xs">908b61fc...</span>
+                </div>
+                <div class="flex justify-between items-center py-2 text-[13px] pt-3">
+                    <span class="text-gray-500 tracking-wide">通信状态</span>
+                    <span class="text-green-500 font-bold flex items-center gap-1.5 bg-green-50 px-2 py-1 rounded-md">
+                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                        加密通道在线
+                    </span>
+                </div>
+            </div>
+
+            <h3 class="font-bold text-gray-800 mb-3 pl-1 text-[15px]">实时诊断日志</h3>
+            <div class="bg-[#1e293b] text-gray-300 rounded-[20px] p-4 h-48 overflow-y-auto text-[11px] font-mono hide-scroll flex flex-col gap-2 shadow-inner"
+                id="logPanel">
+                <!-- logs -->
+            </div>
+        </div>
+
+        <!-- Toast (inside #app) -->
+        <div class="toast" id="sysToast"></div>
+
+    </div> <!-- /App Container -->
+
+    <script>
+        // Init Icons
+        lucide.createIcons();
+
+        // ===== Configuration =====
+        const CONFIG = {
+            accessToken: 'at.5xbcg9ecapxyt2582xwdmrw74glpoyx6-6ikucjjxtu-1kcaygj-lwd7qz3i1',
+            deviceSerial: 'L43005986',
+            validateCode: 'WBP8AB',
+            channelNo: 1
+        };
+
+        // ===== State =====
+        let player = null;
+        let isPlaying = false;
+        let isSoundOn = false;
+        let isRecording = false;
+        let isTalking = false;
+        let currentQuality = 'sd';
+        let isPtzMoving = false;
+        let isPlaybackMode = false;
+
+        // ===== Utility =====
+        function showToast(msg) {
+            const toast = document.getElementById('sysToast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        function getTimeStr() {
+            const d = new Date();
+            return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+        }
+
+        function addLog(msg, isSuccess = true) {
+            const panel = document.getElementById('logPanel');
+            const el = document.createElement('div');
+            const colorClass = isSuccess ? 'text-green-400' : 'text-rose-400';
+            const iconStr = isSuccess ? '→' : '⚠';
+            el.innerHTML = `<span class="text-gray-500">[${getTimeStr()}]</span> <span class="${colorClass}">${iconStr} ${msg}</span>`;
+            panel.insertBefore(el, panel.firstChild);
+            if (panel.children.length > 50) panel.removeChild(panel.lastChild);
+        }
+
+        function updateLoading(text, show) {
+            const ol = document.getElementById('loadingOverlay');
+            document.getElementById('statusText').textContent = text;
+            if (show) ol.classList.remove('opacity-0', 'pointer-events-none');
+            else ol.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        // ===== Bottom Sheet UI =====
+        let activeSheet = null;
+        function openSheet(id) {
+            closeSheet();
+            document.getElementById('sheetOverlay').classList.add('open');
+            const sheet = document.getElementById('sheet' + (id === 'ptz' ? 'Ptz' : 'Info'));
+            sheet.classList.add('open');
+            activeSheet = sheet;
+        }
+        function closeSheet() {
+            document.getElementById('sheetOverlay').classList.remove('open');
+            document.querySelectorAll('.bottom-sheet.open').forEach(el => el.classList.remove('open'));
+            activeSheet = null;
+        }
+
+        // ===== Player Core =====
+        function getEzopenUrl(quality = 'sd', type = 'live') {
+            const base = `ezopen://open.ys7.com/${CONFIG.deviceSerial}/${CONFIG.channelNo}`;
+            if (type === 'rec') return `${base}.rec`;
+            return quality === 'hd' ? `${base}.hd.live` : `${base}.live`;
+        }
+
+        function initPlayer() {
+            addLog('正在分配视频解码资源...', true);
+            const container = document.getElementById('video-container');
+            const width = container.clientWidth || window.innerWidth;
+            const height = Math.floor(width * 9 / 16);
+
+            try {
+                player = new EZUIKit.EZUIKitPlayer({
+                    id: 'video-container',
+                    accessToken: CONFIG.accessToken,
+                    url: getEzopenUrl(currentQuality),
+                    width: width,
+                    height: height,
+                    scaleMode: 1, // aspect fit
+                    handleError: (err) => {
+                        addLog(`播放异常: ${JSON.stringify(err)}`, false);
+                        updateLoading('流媒体加载失败', true);
+                        showToast('视频流加载异常');
+                    },
+                    handleSuccess: () => {
+                        updateLoading('', false);
+                        isPlaying = true;
+                        syncPlayUI();
+                        addLog('视频流解码成功', true);
+                    }
+                });
+
+                // Fail-safe
+                setTimeout(() => {
+                    if (!isPlaying) updateLoading('', false);
+                }, 8000);
+
+            } catch (e) {
+                addLog(`SDK异常: ${e.message}`, false);
+                updateLoading('SDK初始化失败', true);
+            }
+        }
+
+        // ===== Logic Controls =====
+        function syncPlayUI() {
+            const icon = document.getElementById('btnPlayStateIcon');
+            const text = document.getElementById('btnPlayStateText');
+            const liveDot = document.getElementById('liveDot');
+
+            if (isPlaying) {
+                // swap to pause icon
+                icon.innerHTML = '<path d="M10 4H6v16h4V4zm8 0h-4v16h4V4z"/>';
+                icon.setAttribute('viewBox', '0 0 24 24');
+                text.textContent = '暂停';
+                if (liveDot) liveDot.style.display = 'block';
+            } else {
+                // swap to play icon
+                icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+                icon.setAttribute('viewBox', '0 0 24 24');
+                text.textContent = '播放';
+                if (liveDot) liveDot.style.display = 'none';
+            }
+        }
+
+        function togglePlay() {
+            if (!player) { initPlayer(); return; }
+            if (isPlaying) {
+                player.stop().then(() => {
+                    isPlaying = false;
+                    syncPlayUI();
+                    addLog('停止视频流拉取', true);
+                });
+            } else {
+                updateLoading('缓冲视频...', true);
+                player.play().then(() => {
+                    isPlaying = true;
+                    syncPlayUI();
+                    updateLoading('', false);
+                    addLog('恢复实时直播', true);
+                });
+            }
+        }
+
+        function toggleSound() {
+            if (!player) return;
+            const icon = document.getElementById('btnSoundIcon');
+            if (isSoundOn) {
+                player.closeSound();
+                isSoundOn = false;
+                icon.setAttribute('data-lucide', 'volume-x');
+                icon.classList.remove('text-blue-400');
+                showToast('已静音');
+                addLog('关闭音频解码声道', true);
+            } else {
+                player.openSound();
+                isSoundOn = true;
+                icon.setAttribute('data-lucide', 'volume-2');
+                icon.classList.add('text-blue-400');
+                showToast('声音已开启');
+                addLog('开启音频解码声道', true);
+            }
+            lucide.createIcons({ name: 'volume-x' });
+            lucide.createIcons({ name: 'volume-2' });
+        }
+
+        function toggleQuality() {
+            if (!player) return;
+            const label = document.getElementById('qualityBadge');
+            const newQ = currentQuality === 'sd' ? 'hd' : 'sd';
+            const displayStr = newQ === 'hd' ? '超清' : '标清';
+
+            updateLoading('切换流分辨率...', true);
+            player.changePlayUrl({ url: getEzopenUrl(newQ, isPlaybackMode ? 'rec' : 'live') }).then(() => {
+                currentQuality = newQ;
+                label.textContent = displayStr;
+                updateLoading('', false);
+                showToast(`切换至 ${displayStr}`);
+                addLog(`切换通道流为: ${displayStr}`, true);
+            }).catch(err => {
+                updateLoading('', false);
+                addLog(`画质切换回退: ${err}`, false);
+            });
+        }
+
+        async function goFullscreen() {
+            if (!player) return;
+            
+            // 检查是否已经全屏
+            const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+            
+            if (isFullscreen) {
+                // 退出全屏
+                try {
+                    if (document.exitFullscreen) {
+                        await document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        await document.webkitExitFullscreen();
+                    }
+                    addLog('退出全屏模式', true);
+                    showToast('已退出全屏');
+                } catch (e) {
+                    addLog('退出全屏失败: ' + e.message, false);
+                }
+            } else {
+                // 进入全屏
+                const el = document.getElementById('video-wrapper');
+                try {
+                    if (el.requestFullscreen) {
+                        await el.requestFullscreen();
+                    } else if (el.webkitRequestFullscreen) {
+                        await el.webkitRequestFullscreen();
+                    }
+                    
+                    // 全屏后锁定为横屏
+                    if (screen.orientation && screen.orientation.lock) {
+                        try {
+                            await screen.orientation.lock('landscape');
+                            addLog('已切换至横屏模式', true);
+                            showToast('横屏全屏模式');
+                        } catch (err) {
+                            addLog('屏幕方向锁定失败: ' + err.message, false);
+                        }
+                    }
+                } catch (e) { 
+                    addLog('全屏API调用受限: ' + e.message, false); 
+                }
+            }
+        }
+
+        function capture() {
+            if (!player) return;
+            const name = `EZVIZ_${Date.now()}`;
+            player.capturePicture(name);
+            showToast('已保存至系统相册');
+            addLog(`保存原始截图帧: ${name}.jpeg`, true);
+        }
+
+        function toggleRecord() {
+            if (!player) return;
+            const bg = document.getElementById('btnRecordBg');
+            const icon = document.getElementById('btnRecordIcon');
+            const text = document.getElementById('btnRecordText');
+
+            if (isRecording) {
+                player.stopSave().then(() => {
+                    isRecording = false;
+                    bg.style.background = '';
+                    icon.style.color = '';
+                    text.style.color = '';
+                    showToast('录像文件已保存');
+                    addLog('停止录制，落盘视频片段', true);
+                });
+            } else {
+                const name = `REC_${Date.now()}`;
+                player.startSave(name).then(() => {
+                    isRecording = true;
+                    bg.style.background = '#fef2f2';
+                    icon.style.color = '#ef4444';
+                    text.style.color = '#ef4444';
+                    showToast('🔴 录像中...');
+                    addLog(`开始录制数据流: ${name}.mp4`, true);
+                });
+            }
+        }
+
+        function switchToPlayback() {
+            if (!player) return;
+            const wrap = document.getElementById('btnPlaybackWrap');
+            const text = document.getElementById('liveText');
+
+            updateLoading('请求云端录像流...', true);
+            if (isPlaybackMode) {
+                // 回直播
+                player.changePlayUrl({ url: getEzopenUrl(currentQuality, 'live'), type: 'live' }).then(() => {
+                    isPlaybackMode = false;
+                    wrap.classList.remove('text-blue-500');
+                    text.textContent = 'LIVE';
+                    updateLoading('', false);
+                    showToast('返回视频直播');
+                    addLog('切回实时直播模式', true);
+                });
+            } else {
+                // 进回放
+                player.changePlayUrl({ url: getEzopenUrl(currentQuality, 'rec'), type: 'rec' }).then(() => {
+                    isPlaybackMode = true;
+                    wrap.classList.add('text-blue-500');
+                    text.textContent = '回放';
+                    updateLoading('', false);
+                    showToast('开启云端回放');
+                    addLog('切入云端历史时序流', true);
+                });
+            }
+        }
+
+        function toggleTalk() {
+            const bubble = document.getElementById('btnTalkBubble');
+            const textL = document.getElementById('btnTalkText');
+
+            if (isTalking) {
+                // --- 停止对讲 ---
+                if (player) player.stopTalk();
+                isTalking = false;
+                bubble.classList.remove('talk-active');
+                bubble.style.cssText = 'padding:18px; border-radius:50%; background:#eff6ff; color:#3b82f6; border:4px solid #fff; box-shadow:0 4px 16px rgba(59,130,246,0.18); transition:all 0.3s; width:72px; height:72px; display:flex; align-items:center; justify-content:center;';
+                textL.textContent = '语音对讲';
+                textL.style.color = '#3b82f6';
+                showToast('通话已结束');
+                addLog('关闭双向对讲通道', true);
+                return;
+            }
+
+            // --- 开始对讲：先请求麦克风权限 ---
+            if (!player) {
+                showToast('视频流未加载，请稍候');
+                return;
+            }
+
+            const doStartTalk = () => {
+                try {
+                    player.startTalk();
+                    isTalking = true;
+                    // 使用预定义 CSS 类激活状态（避免 Tailwind CDN 任意值类的扫描问题）
+                    bubble.classList.add('talk-active');
+                    textL.textContent = '对讲中…点击结束';
+                    textL.style.color = '#2563eb';
+                    showToast('🎙 对讲通道已建立');
+                    addLog('双向对讲通道已开启', true);
+                } catch (e) {
+                    addLog('对讲启动失败: ' + e.message, false);
+                    showToast('对讲启动失败，请刷新重试');
+                }
+            };
+
+            // 浏览器原生麦克风权限申请（比 SDK 的 getMicrophonePermission 更可靠）
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                        // 获得权限后立刻关闭这个测试流，让 SDK 自己打开
+                        stream.getTracks().forEach(t => t.stop());
+                        doStartTalk();
+                    })
+                    .catch(err => {
+                        addLog('麦克风权限被拒绝: ' + err.message, false);
+                        showToast('请在浏览器设置中允许麦克风访问');
+                    });
+            } else {
+                // 不支持权限 API 时直接尝试
+                doStartTalk();
+            }
+        }
+
+        // ===== PTZ API Request =====
+        function ptzStart(dir) {
+            if (isPtzMoving) return;
+            isPtzMoving = true;
+
+            const data = new URLSearchParams({
+                accessToken: CONFIG.accessToken,
+                deviceSerial: CONFIG.deviceSerial,
+                channelNo: CONFIG.channelNo,
+                direction: dir,
+                speed: 1
+            });
+
+            fetch('https://open.ys7.com/api/lapp/device/ptz/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: data.toString()
+            }).then(r => r.json()).then(res => {
+                if (res.code === '200') {
+                    addLog(`发送硬件舵机指令: ${dir}`, true);
+                } else {
+                    isPtzMoving = false;
+                    addLog(`云台指令下发错误: ${res.msg}`, false);
+                }
+            }).catch(() => { isPtzMoving = false; });
+        }
+
+        function ptzStop() {
+            if (!isPtzMoving) return;
+            const data = new URLSearchParams({
+                accessToken: CONFIG.accessToken,
+                deviceSerial: CONFIG.deviceSerial,
+                channelNo: CONFIG.channelNo
+            });
+            fetch('https://open.ys7.com/api/lapp/device/ptz/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: data.toString()
+            }).finally(() => {
+                isPtzMoving = false;
+                addLog('中断硬件舵机指令', true);
+            });
+        }
+
+        // Resize Hook
+        window.addEventListener('resize', () => {
+            if (player) {
+                const w = document.getElementById('video-container').clientWidth;
+                try { player.resize(w, Math.floor(w * 9 / 16)); } catch (e) { }
+            }
+        });
+
+        // 监听全屏退出事件，解锁屏幕方向
+        document.addEventListener('fullscreenchange', () => {
+            const icon = document.getElementById('btnFullscreenIcon');
+            if (!document.fullscreenElement) {
+                if (screen.orientation && screen.orientation.unlock) {
+                    screen.orientation.unlock();
+                    addLog('已解锁屏幕方向', true);
+                }
+                // 切换为进入全屏图标
+                icon.setAttribute('data-lucide', 'maximize-2');
+                lucide.createIcons();
+            } else {
+                // 切换为退出全屏图标
+                icon.setAttribute('data-lucide', 'minimize-2');
+                lucide.createIcons();
+            }
+        });
+        
+        document.addEventListener('webkitfullscreenchange', () => {
+            const icon = document.getElementById('btnFullscreenIcon');
+            if (!document.webkitFullscreenElement) {
+                if (screen.orientation && screen.orientation.unlock) {
+                    screen.orientation.unlock();
+                    addLog('已解锁屏幕方向', true);
+                }
+                // 切换为进入全屏图标
+                icon.setAttribute('data-lucide', 'maximize-2');
+                lucide.createIcons();
+            } else {
+                // 切换为退出全屏图标
+                icon.setAttribute('data-lucide', 'minimize-2');
+                lucide.createIcons();
+            }
+        });
+
+        // Lifecycle
+        document.addEventListener('DOMContentLoaded', () => {
+            addLog('核心基建服务装载完毕', true);
+            setTimeout(initPlayer, 600);
+        });
+
+    </script>
+</body>
+
+</html>
