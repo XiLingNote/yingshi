@@ -802,6 +802,48 @@
             }
         }
 
+        // 检测是否在微信浏览器中
+        function isWeChat() {
+            return /MicroMessenger/i.test(navigator.userAgent);
+        }
+
+        // 显示微信浏览器提示
+        function showWeChatTip() {
+            const tip = document.createElement('div');
+            tip.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.9);
+                z-index: 9999;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+                color: white;
+                text-align: center;
+            `;
+            tip.innerHTML = `
+                <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+                <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">微信浏览器限制</div>
+                <div style="font-size: 14px; line-height: 1.6; margin-bottom: 20px; opacity: 0.9;">
+                    微信内置浏览器不支持对讲功能<br>
+                    请点击右上角 "..." 菜单<br>
+                    选择"在浏览器中打开"
+                </div>
+                <div style="margin-top: 20px; padding: 12px 24px; background: rgba(255,255,255,0.1); border-radius: 8px; font-size: 12px;">
+                    推荐使用：Safari、Chrome、Edge 浏览器
+                </div>
+                <button onclick="this.parentElement.remove()" style="margin-top: 30px; padding: 12px 32px; background: #3b82f6; border: none; border-radius: 8px; color: white; font-size: 14px; font-weight: bold;">
+                    我知道了
+                </button>
+            `;
+            document.body.appendChild(tip);
+        }
+
         function toggleTalk() {
             const bubble = document.getElementById('btnTalkBubble');
             const textL = document.getElementById('btnTalkText');
@@ -822,11 +864,29 @@
             // --- 开始对讲：先请求麦克风权限 ---
             if (!player) {
                 showToast('视频流未加载，请稍候');
+                addLog('对讲失败: 播放器未初始化', false);
                 return;
             }
 
+            // 检测微信浏览器
+            if (isWeChat()) {
+                addLog('⚠️ 检测到微信浏览器环境', false);
+                showWeChatTip();
+                return;
+            }
+
+            // 检查是否为 HTTPS
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                showToast('⚠️ 对讲需要 HTTPS 环境');
+                addLog('对讲失败: 非安全上下文 (需要HTTPS)', false);
+                return;
+            }
+
+            addLog('开始请求麦克风权限...', true);
+
             const doStartTalk = () => {
                 try {
+                    addLog('调用 SDK startTalk()...', true);
                     player.startTalk();
                     isTalking = true;
                     // 使用预定义 CSS 类激活状态（避免 Tailwind CDN 任意值类的扫描问题）
@@ -834,26 +894,40 @@
                     textL.textContent = '对讲中…点击结束';
                     textL.style.color = '#2563eb';
                     showToast('🎙 对讲通道已建立');
-                    addLog('双向对讲通道已开启', true);
+                    addLog('✅ 双向对讲通道已开启', true);
                 } catch (e) {
-                    addLog('对讲启动失败: ' + e.message, false);
-                    showToast('对讲启动失败，请刷新重试');
+                    addLog('❌ 对讲启动失败: ' + e.message, false);
+                    console.error('对讲错误详情:', e);
+                    showToast('对讲启动失败: ' + e.message);
                 }
             };
 
             // 浏览器原生麦克风权限申请（比 SDK 的 getMicrophonePermission 更可靠）
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                addLog('检测到 MediaDevices API 支持', true);
                 navigator.mediaDevices.getUserMedia({ audio: true })
                     .then(stream => {
+                        addLog('✅ 麦克风权限已授予', true);
                         // 获得权限后立刻关闭这个测试流，让 SDK 自己打开
                         stream.getTracks().forEach(t => t.stop());
                         doStartTalk();
                     })
                     .catch(err => {
-                        addLog('麦克风权限被拒绝: ' + err.message, false);
-                        showToast('请在浏览器设置中允许麦克风访问');
+                        addLog('❌ 麦克风权限被拒绝: ' + err.name + ' - ' + err.message, false);
+                        console.error('麦克风权限错误:', err);
+                        
+                        if (err.name === 'NotAllowedError') {
+                            showToast('⚠️ 请允许麦克风访问');
+                        } else if (err.name === 'NotFoundError') {
+                            showToast('⚠️ 未检测到麦克风设备');
+                        } else if (err.name === 'NotSupportedError') {
+                            showToast('⚠️ 浏览器不支持麦克风');
+                        } else {
+                            showToast('麦克风错误: ' + err.message);
+                        }
                     });
             } else {
+                addLog('⚠️ 浏览器不支持 MediaDevices API，尝试直接启动', false);
                 // 不支持权限 API 时直接尝试
                 doStartTalk();
             }
