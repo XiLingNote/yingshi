@@ -505,7 +505,9 @@
 
         // ===== Configuration =====
         const CONFIG = {
-            accessToken: 'at.5xbcg9ecapxyt2582xwdmrw74glpoyx6-6ikucjjxtu-1kcaygj-lwd7qz3i1',
+            appKey: '908b61fc003d497d937b1f3452610038',
+            appSecret: '327dfac87d024c7717061af5a2f5d950',
+            accessToken: '',
             deviceSerial: 'L43005986',
             validateCode: 'WBP8AB',
             channelNo: 1
@@ -694,10 +696,10 @@
 
         async function goFullscreen() {
             if (!player) return;
-            
+
             // 检查是否已经全屏
             const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
-            
+
             if (isFullscreen) {
                 // 退出全屏
                 try {
@@ -720,7 +722,7 @@
                     } else if (el.webkitRequestFullscreen) {
                         await el.webkitRequestFullscreen();
                     }
-                    
+
                     // 全屏后锁定为横屏
                     if (screen.orientation && screen.orientation.lock) {
                         try {
@@ -731,8 +733,8 @@
                             addLog('屏幕方向锁定失败: ' + err.message, false);
                         }
                     }
-                } catch (e) { 
-                    addLog('全屏API调用受限: ' + e.message, false); 
+                } catch (e) {
+                    addLog('全屏API调用受限: ' + e.message, false);
                 }
             }
         }
@@ -915,7 +917,7 @@
                     .catch(err => {
                         addLog('❌ 麦克风权限被拒绝: ' + err.name + ' - ' + err.message, false);
                         console.error('麦克风权限错误:', err);
-                        
+
                         if (err.name === 'NotAllowedError') {
                             showToast('⚠️ 请允许麦克风访问');
                         } else if (err.name === 'NotFoundError') {
@@ -1002,7 +1004,7 @@
                 lucide.createIcons();
             }
         });
-        
+
         document.addEventListener('webkitfullscreenchange', () => {
             const icon = document.getElementById('btnFullscreenIcon');
             if (!document.webkitFullscreenElement) {
@@ -1020,10 +1022,47 @@
             }
         });
 
+        // 自动获取 Token
+        async function fetchToken() {
+            try {
+                updateLoading('正在获取认证凭证...', true);
+                const formData = new URLSearchParams({
+                    appKey: CONFIG.appKey,
+                    appSecret: CONFIG.appSecret
+                });
+
+                const res = await fetch('https://open.ys7.com/api/lapp/token/get', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: formData.toString()
+                });
+
+                const data = await res.json();
+                if (data.code === '200' && data.data && data.data.accessToken) {
+                    CONFIG.accessToken = data.data.accessToken;
+                    addLog('获取 Token 成功', true);
+                    return true;
+                } else {
+                    addLog(`获取 Token 失败: ${data.msg || '未知错误'}`, false);
+                    updateLoading('认证失败', true);
+                    return false;
+                }
+            } catch (err) {
+                addLog('Token 请求异常: ' + err.message, false);
+                updateLoading('网络异常', true);
+                return false;
+            }
+        }
+
         // Lifecycle
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             addLog('核心基建服务装载完毕', true);
-            setTimeout(initPlayer, 600);
+            const success = await fetchToken();
+            if (success) {
+                setTimeout(initPlayer, 600);
+            }
         });
 
     </script>
