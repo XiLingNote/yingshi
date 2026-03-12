@@ -247,13 +247,26 @@
 
         /* Fullscreen utility for the wrapper */
         :-webkit-full-screen #video-wrapper {
-            width: 100vw;
-            height: 100vh;
+            width: 100vw !important;
+            height: 100vh !important;
+            aspect-ratio: auto !important;
+            border-radius: 0 !important;
         }
 
         :fullscreen #video-wrapper {
-            width: 100vw;
-            height: 100vh;
+            width: 100vw !important;
+            height: 100vh !important;
+            aspect-ratio: auto !important;
+            border-radius: 0 !important;
+        }
+
+        /* 仅在全屏模式下显示全屏专属对讲按钮 */
+        :-webkit-full-screen #fullscreenTalkBtn {
+            display: flex !important;
+        }
+
+        :fullscreen #fullscreenTalkBtn {
+            display: flex !important;
         }
     </style>
 </head>
@@ -310,6 +323,18 @@
                     onclick="goFullscreen()" id="btnFullscreen">
                     <i data-lucide="maximize-2" class="w-4 h-4" id="btnFullscreenIcon"></i>
                 </div>
+            </div>
+
+            <!-- 全屏专属对讲按钮 (默认隐藏，靠右侧居中，边缘透明玻璃态样式) -->
+            <div id="fullscreenTalkBtn"
+                class="hidden absolute right-safe right-8 top-1/2 -translate-y-1/2 flex-col items-center gap-2 cursor-pointer z-40 transition-transform active:scale-95"
+                onclick="toggleTalk()">
+                <div class="w-16 h-16 rounded-full bg-black/30 backdrop-blur-md border border-white/30 text-white flex items-center justify-center shadow-lg transition-all"
+                    id="fsTalkBubble">
+                    <i data-lucide="mic" class="w-7 h-7" id="fsTalkIcon"></i>
+                </div>
+                <span class="text-white/90 text-[11px] font-medium tracking-wide drop-shadow-md"
+                    id="fsTalkText">语音对讲</span>
             </div>
         </div>
 
@@ -849,6 +874,8 @@
         function toggleTalk() {
             const bubble = document.getElementById('btnTalkBubble');
             const textL = document.getElementById('btnTalkText');
+            const fsBubble = document.getElementById('fsTalkBubble');
+            const fsTextL = document.getElementById('fsTalkText');
 
             if (isTalking) {
                 // --- 停止对讲 ---
@@ -858,6 +885,17 @@
                 bubble.style.cssText = 'padding:18px; border-radius:50%; background:#eff6ff; color:#3b82f6; border:4px solid #fff; box-shadow:0 4px 16px rgba(59,130,246,0.18); transition:all 0.3s; width:72px; height:72px; display:flex; align-items:center; justify-content:center;';
                 textL.textContent = '语音对讲';
                 textL.style.color = '#3b82f6';
+
+                if (fsBubble) {
+                    fsBubble.classList.remove('talk-active');
+                    fsBubble.style.background = 'rgba(0,0,0,0.3)';
+                    fsBubble.style.borderColor = 'rgba(255,255,255,0.3)';
+                }
+                if (fsTextL) {
+                    fsTextL.textContent = '语音对讲';
+                    fsTextL.style.color = 'rgba(255,255,255,0.9)';
+                }
+
                 showToast('通话已结束');
                 addLog('关闭双向对讲通道', true);
                 return;
@@ -895,6 +933,17 @@
                     bubble.classList.add('talk-active');
                     textL.textContent = '对讲中…点击结束';
                     textL.style.color = '#2563eb';
+
+                    if (fsBubble) {
+                        fsBubble.classList.add('talk-active');
+                        fsBubble.style.background = '';
+                        fsBubble.style.borderColor = '';
+                    }
+                    if (fsTextL) {
+                        fsTextL.textContent = '对讲中…点击结束';
+                        fsTextL.style.color = '#60a5fa';
+                    }
+
                     showToast('🎙 对讲通道已建立');
                     addLog('✅ 双向对讲通道已开启', true);
                 } catch (e) {
