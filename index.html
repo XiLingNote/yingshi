@@ -245,12 +245,13 @@
             transform: translate(-50%, 0);
         }
 
-        /* Fullscreen utility for the wrapper */
+        /* Fullscreen utility for the wrapper (native API) */
         :-webkit-full-screen #video-wrapper {
             width: 100vw !important;
             height: 100vh !important;
             aspect-ratio: auto !important;
             border-radius: 0 !important;
+            background: #000 !important;
         }
 
         :fullscreen #video-wrapper {
@@ -258,6 +259,40 @@
             height: 100vh !important;
             aspect-ratio: auto !important;
             border-radius: 0 !important;
+            background: #000 !important;
+        }
+
+        /* 模拟全屏模式（微信等不支持 Fullscreen API 的浏览器） */
+        #video-wrapper.fake-fullscreen {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+            z-index: 99999 !important;
+            aspect-ratio: auto !important;
+            border-radius: 0 !important;
+            background: #000 !important;
+        }
+
+        /* 模拟全屏下视频容器也要撑满 */
+        #video-wrapper.fake-fullscreen #video-container {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        #video-wrapper.fake-fullscreen #video-container iframe,
+        #video-wrapper.fake-fullscreen #video-container video,
+        #video-wrapper.fake-fullscreen #video-container canvas {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain !important;
+        }
+
+        /* 模拟全屏下也显示全屏对讲按钮 */
+        #video-wrapper.fake-fullscreen #fullscreenTalkBtn {
+            display: flex !important;
         }
 
         /* 仅在全屏模式下显示全屏专属对讲按钮 */
@@ -719,14 +754,105 @@
             });
         }
 
+        // 是否处于模拟全屏状态
+        let isFakeFullscreen = false;
+
+        // 判断当前是否处于任何全屏状态（原生或模拟）
+        function isInFullscreen() {
+            return !!(document.fullscreenElement || document.webkitFullscreenElement || isFakeFullscreen);
+        }
+
+        // 全屏后调整播放器尺寸以撑满屏幕
+        function resizePlayerToFullscreen() {
+            if (!player) return;
+            // 等一帧让布局生效
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    const w = window.innerWidth || screen.width;
+                    const h = window.innerHeight || screen.height;
+                    // 全屏模式下用屏幕实际宽高，不再保持 16:9
+                    try {
+                        player.resize(w, h);
+                        addLog(`全屏 resize: ${w}x${h}`, true);
+                    } catch (e) {
+                        addLog('全屏 resize 失败: ' + e.message, false);
+                    }
+                }, 300);
+            });
+        }
+
+        // 退出全屏后恢复播放器尺寸
+        function resizePlayerToNormal() {
+            if (!player) return;
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    const container = document.getElementById('video-container');
+                    const w = container.clientWidth || window.innerWidth;
+                    const h = Math.floor(w * 9 / 16);
+                    try {
+                        player.resize(w, h);
+                        addLog(`恢复 resize: ${w}x${h}`, true);
+                    } catch (e) { }
+                }, 300);
+            });
+        }
+
+        // 进入模拟全屏（微信等不支持 Fullscreen API 的浏览器）
+        function enterFakeFullscreen() {
+            const el = document.getElementById('video-wrapper');
+            el.classList.add('fake-fullscreen');
+            isFakeFullscreen = true;
+
+            // 尝试锁定横屏
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+
+            resizePlayerToFullscreen();
+            addLog('进入模拟全屏模式', true);
+            showToast('全屏模式');
+
+            // 更新图标
+            const icon = document.getElementById('btnFullscreenIcon');
+            icon.setAttribute('data-lucide', 'minimize-2');
+            lucide.createIcons();
+        }
+
+        // 退出模拟全屏
+        function exitFakeFullscreen() {
+            const el = document.getElementById('video-wrapper');
+            el.classList.remove('fake-fullscreen');
+            isFakeFullscreen = false;
+
+            // 解锁屏幕方向
+            if (screen.orientation && screen.orientation.unlock) {
+                screen.orientation.unlock();
+            }
+
+            resizePlayerToNormal();
+            addLog('退出模拟全屏模式', true);
+            showToast('已退出全屏');
+
+            // 更新图标
+            const icon = document.getElementById('btnFullscreenIcon');
+            icon.setAttribute('data-lucide', 'maximize-2');
+            lucide.createIcons();
+        }
+
         async function goFullscreen() {
             if (!player) return;
 
-            // 检查是否已经全屏
-            const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+            // 如果处于模拟全屏，退出
+            if (isFakeFullscreen) {
+                exitFakeFullscreen();
+                return;
+            }
 
-            if (isFullscreen) {
-                // 退出全屏
+            // 检查是否已经原生全屏
+            const nativeFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+
+            if (nativeFullscreen) {
+                // 退出原生全屏
                 try {
                     if (document.exitFullscreen) {
                         await document.exitFullscreen();
@@ -739,27 +865,37 @@
                     addLog('退出全屏失败: ' + e.message, false);
                 }
             } else {
-                // 进入全屏
+                // 尝试进入原生全屏
                 const el = document.getElementById('video-wrapper');
+                let nativeSuccess = false;
+
                 try {
                     if (el.requestFullscreen) {
                         await el.requestFullscreen();
+                        nativeSuccess = true;
                     } else if (el.webkitRequestFullscreen) {
                         await el.webkitRequestFullscreen();
+                        nativeSuccess = true;
                     }
+                } catch (e) {
+                    addLog('原生全屏API不可用: ' + e.message, false);
+                }
 
-                    // 全屏后锁定为横屏
+                if (nativeSuccess) {
+                    // 原生全屏成功，锁定横屏并 resize
                     if (screen.orientation && screen.orientation.lock) {
                         try {
                             await screen.orientation.lock('landscape');
                             addLog('已切换至横屏模式', true);
-                            showToast('横屏全屏模式');
                         } catch (err) {
                             addLog('屏幕方向锁定失败: ' + err.message, false);
                         }
                     }
-                } catch (e) {
-                    addLog('全屏API调用受限: ' + e.message, false);
+                    resizePlayerToFullscreen();
+                    showToast('横屏全屏模式');
+                } else {
+                    // 原生全屏不支持（微信等），使用模拟全屏
+                    enterFakeFullscreen();
                 }
             }
         }
@@ -1028,15 +1164,21 @@
             });
         }
 
-        // Resize Hook
+        // Resize Hook - 全屏和非全屏分别处理
         window.addEventListener('resize', () => {
-            if (player) {
+            if (!player) return;
+            if (isInFullscreen()) {
+                // 全屏状态下用屏幕实际尺寸
+                const w = window.innerWidth || screen.width;
+                const h = window.innerHeight || screen.height;
+                try { player.resize(w, h); } catch (e) { }
+            } else {
                 const w = document.getElementById('video-container').clientWidth;
                 try { player.resize(w, Math.floor(w * 9 / 16)); } catch (e) { }
             }
         });
 
-        // 监听全屏退出事件，解锁屏幕方向
+        // 监听全屏退出事件，解锁屏幕方向并恢复播放器尺寸
         document.addEventListener('fullscreenchange', () => {
             const icon = document.getElementById('btnFullscreenIcon');
             if (!document.fullscreenElement) {
@@ -1044,13 +1186,13 @@
                     screen.orientation.unlock();
                     addLog('已解锁屏幕方向', true);
                 }
-                // 切换为进入全屏图标
                 icon.setAttribute('data-lucide', 'maximize-2');
                 lucide.createIcons();
+                resizePlayerToNormal();
             } else {
-                // 切换为退出全屏图标
                 icon.setAttribute('data-lucide', 'minimize-2');
                 lucide.createIcons();
+                resizePlayerToFullscreen();
             }
         });
 
@@ -1061,13 +1203,13 @@
                     screen.orientation.unlock();
                     addLog('已解锁屏幕方向', true);
                 }
-                // 切换为进入全屏图标
                 icon.setAttribute('data-lucide', 'maximize-2');
                 lucide.createIcons();
+                resizePlayerToNormal();
             } else {
-                // 切换为退出全屏图标
                 icon.setAttribute('data-lucide', 'minimize-2');
                 lucide.createIcons();
+                resizePlayerToFullscreen();
             }
         });
 
